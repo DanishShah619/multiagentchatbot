@@ -3,6 +3,7 @@ import axios from "axios"
 import { graph } from "../graph/graph.js"
 import { addMessage } from "../config/memory.js"
 import { deductCredits } from "../utils/deductCredits.js"
+import { uploadToCloudinary } from "../utils/cloudinary.js"
 
 const refundCredits = async (userId, agent) => {
     try {
@@ -38,12 +39,20 @@ export const agent = async (req, res, next) => {
         }
         creditDeducted = true
 
+        let fileUrl = null
+        if (file) {
+            const uploadRes = await uploadToCloudinary(file.path)
+            if (uploadRes) {
+                fileUrl = uploadRes.url
+            }
+        }
+
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`, {
             conversationId, role: "user", content: prompt
         })
 
         const result = await graph.invoke({
-            prompt, conversationId, agent: targetAgent, userId, file
+            prompt, conversationId, agent: targetAgent, userId, file, fileUrl
         })
 
         await addMessage(conversationId, "user", prompt)
