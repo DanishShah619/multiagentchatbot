@@ -21,9 +21,14 @@ app.use((req, res, next) => {
     next()
 })
 
+// IMPORTANT: Mount router BEFORE express.json() middleware.
+// The /webhook route uses express.raw() internally (see billing.route.js)
+// and must receive the raw Buffer body for Stripe signature verification.
+// Registering it after express.json() would silently break webhook validation.
+app.use("/", router)
+
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
-app.use("/",router)
 app.get("/",(req,res)=>{
     res.json({message:"hello from billing"})
 })

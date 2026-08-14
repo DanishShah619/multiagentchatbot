@@ -1,84 +1,126 @@
 import axios from "axios"
+import stripe from "../config/stripe.js"
 import { PLANS } from "../config/Plans.js"
-import razorpay from "../config/razorpay.js"
 import Payment from "../models/payment.model.js"
-import crypto from "crypto"
-export const createOrder = async (req, res) => {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// createCheckoutSession
+// Creates a Stripe Checkout Session and returns the hosted payment URL.
+// The frontend redirects the user to this URL — no card details handled by us.
+// ─────────────────────────────────────────────────────────────────────────────
+export const createCheckoutSession = async (req, res) => {
     try {
         const { plan } = req.body
         const userId = req.headers["x-user-id"]
-        const selectedPlan = PLANS[plan]
 
-        if (!selectedPlan) {
-            return res.status(404).json({ message: "plan not found" })
+        const selectedPlan = PLANS[plan]
+        if (!selectedPlan || !selectedPlan.priceId) {
+            return res.status(400).json({ message: "Invalid or non-purchasable plan" })
         }
 
-        const order = await razorpay.orders.create({
-            amount: selectedPlan.amount * 100,
-            currency: "INR",
-            receipt: `receipt-${Date.now()}`
+        // Create Stripe Checkout Session
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items: [
+                {
+                    price: selectedPlan.priceId,
+                    quantity: 1
+                }
+            ],
+            mode: "payment",
+            // Stripe redirects user here after payment
+            success_url: `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/payment/cancelled`,
+            // Attach userId so webhook can identify the user
+            metadata: {
+                userId,
+                plan: selectedPlan.id,
+                credits: String(selectedPlan.credits)
+            }
         })
 
+        // Persist a pending payment record for idempotency tracking
         await Payment.create({
             userId,
-            orderId: order.id,
+            orderId: session.id,           // Stripe Session ID (cs_xxx)
             amount: selectedPlan.amount,
             credits: selectedPlan.credits,
             plan: selectedPlan.id,
-            currency: order.currency,
+            currency: selectedPlan.currency,
             status: "created"
         })
 
-        return res.status(200).json({ order, plan: selectedPlan })
-
-
+        return res.status(200).json({ url: session.url })
 
     } catch (error) {
-        console.error("[billing/createOrder]", error)
+        console.error("[billing/createCheckoutSession]", error)
         return res.status(500).json({ message: "Internal server error" })
     }
 }
 
 
-export const verifyPayment = async (req,res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// stripeWebhook
+// Stripe calls this endpoint directly after a successful payment.
+// MUST receive the raw body (not parsed JSON) to validate signature.
+// ─────────────────────────────────────────────────────────────────────────────
+export const stripeWebhook = async (req, res) => {
+    const sig = req.headers["stripe-signature"]
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+    let event
+
     try {
-        const {razorpay_order_id, razorpay_payment_id,razorpay_signature} = req.body
+        // Validate webhook signature — prevents spoofed events
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
+    } catch (err) {
+        console.error("[billing/stripeWebhook] Signature verification failed:", err.message)
+        return res.status(400).json({ message: `Webhook signature error: ${err.message}` })
+    }
 
-        const generateSignature=crypto
-                               .createHmac("sha256",process.env.RAZORPAY_KEY_SECRET)
-                               .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-                               .digest("hex")
+    // Only handle successful checkout events
+    if (event.type !== "checkout.session.completed") {
+        return res.status(200).json({ received: true })
+    }
 
- if(generateSignature !== razorpay_signature){
-    return res.status(400).json({message:"Payment Verification Failed"})
- }
+    const session = event.data.object
 
- const payment=await Payment.findOne({orderId:razorpay_order_id})
+    try {
+        const { userId, plan, credits } = session.metadata
 
- if(!payment){
-    return res.status(404).json({message:"Payment Not Found"})
- }
+        // Idempotency: find by orderId (Stripe Session ID) and check status
+        const payment = await Payment.findOne({ orderId: session.id })
 
- // OPT-07: Replay attack & double-credit prevention check
- if(payment.status === "paid"){
-    return res.status(409).json({message:"Payment has already been verified and processed"})
- }
+        if (!payment) {
+            console.error("[billing/stripeWebhook] Payment record not found for session:", session.id)
+            return res.status(404).json({ message: "Payment record not found" })
+        }
 
- payment.status="paid"
- payment.paymentId=razorpay_payment_id
- await payment.save()
+        // OPT-07: Replay attack prevention — skip if already processed
+        if (payment.status === "paid") {
+            console.warn("[billing/stripeWebhook] Duplicate webhook received for session:", session.id)
+            return res.status(200).json({ received: true })
+        }
 
- const internalSecret = process.env.INTERNAL_SECRET || "cortexai-internal-secret-key-2026"
- const {data}=await axios.post(
-    `${process.env.AUTH_SERVICE}/update-plan`,
-    {userId:payment.userId,plan:payment.plan,credits:payment.credits},
-    {headers:{"x-internal-secret": internalSecret}}
- )
+        // Mark payment as paid atomically
+        payment.status = "paid"
+        payment.paymentId = session.payment_intent   // Stripe PaymentIntent ID (pi_xxx)
+        await payment.save()
 
- return res.status(200).json({message:"Payment Verified"})
+        // Notify auth service to upgrade user plan and credit balance
+        const internalSecret = process.env.INTERNAL_SECRET || "cortexai-internal-secret-key-2026"
+        await axios.post(
+            `${process.env.AUTH_SERVICE}/update-plan`,
+            { userId, plan, credits: parseInt(credits, 10) },
+            { headers: { "x-internal-secret": internalSecret } }
+        )
+
+        console.info(`[billing/stripeWebhook] Payment processed for user ${userId}, plan: ${plan}`)
+        return res.status(200).json({ received: true })
 
     } catch (error) {
-        console.error("[billing/verifyPayment]", error)
-        return res.status(500).json({ message: "Internal server error" })
+        console.error("[billing/stripeWebhook] Processing error:", error)
+        // Return 500 so Stripe retries the webhook delivery
+        return res.status(500).json({ message: "Webhook processing failed" })
     }
 }

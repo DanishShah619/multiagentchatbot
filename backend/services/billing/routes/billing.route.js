@@ -1,6 +1,7 @@
 import express from "express"
-import { createOrder, verifyPayment } from "../controllers/billing.controller.js"
-const router=express.Router()
+import { createCheckoutSession, stripeWebhook } from "../controllers/billing.controller.js"
+
+const router = express.Router()
 
 const requireUserId = (req, res, next) => {
     const userId = req.headers["x-user-id"]
@@ -10,7 +11,16 @@ const requireUserId = (req, res, next) => {
     next()
 }
 
-router.post("/create",requireUserId,createOrder)
-router.post("/verify",verifyPayment)
+// Creates Stripe Checkout Session — returns { url } to redirect user
+router.post("/create-session", requireUserId, createCheckoutSession)
+
+// Stripe calls this webhook directly after payment succeeds.
+// CRITICAL: Must use express.raw() middleware (not JSON) so Stripe can verify the signature.
+// This is mounted BEFORE express.json() in index.js.
+router.post(
+    "/webhook",
+    express.raw({ type: "application/json" }),
+    stripeWebhook
+)
 
 export default router
