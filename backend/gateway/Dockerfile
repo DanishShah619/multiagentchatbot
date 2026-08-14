@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package.json package-lock.json* ./
-RUN npm install --production --frozen-lockfile
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy application source
 COPY . .

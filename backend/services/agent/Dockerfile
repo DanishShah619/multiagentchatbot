@@ -14,7 +14,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install --production --frozen-lockfile
+RUN npm install --omit=dev --legacy-peer-deps
 
 COPY . .
 
