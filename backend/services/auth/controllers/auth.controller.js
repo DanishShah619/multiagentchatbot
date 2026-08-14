@@ -38,10 +38,13 @@ export const login = async (req, res) => {
 
 
 
+        const isProduction = process.env.NODE_ENV === "production"
+        const isCrossDomain = isProduction || true // sslip.io to vercel is cross-site
+
         res.cookie("session", sessionId, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
+            secure: true,
+            sameSite: "none",
             maxAge: 7 * 24 * 60 * 60 * 1000
         })
 
@@ -63,8 +66,8 @@ export const logOut = async (req, res) => {
         // SEC-05: Pass matching options to ensure browsers honor clearance
         res.clearCookie("session", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict"
+            secure: true,
+            sameSite: "none"
         })
         return res.status(200).json({ message: "logout successfully" })
     } catch (error) {
