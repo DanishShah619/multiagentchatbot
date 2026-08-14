@@ -1,21 +1,26 @@
 # Caddyfile for CortexAI Platform
 # Caddy automatically provisions and renews HTTPS SSL certificates via Let's Encrypt / ZeroSSL
+# Replace yourdomain.com with your actual domain name pointed to this EC2's Elastic IP.
 
 yourdomain.com {
-    # Reverse proxy all incoming web & API traffic to the Express Gateway running on port 5000
-    reverse_proxy localhost:5000 {
+    # Reverse proxy to Express Gateway via Docker internal network
+    reverse_proxy gateway:5000 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
 
-    # Security Headers
+    # OWASP Security Headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         X-XSS-Protection "0"
         Referrer-Policy "no-referrer-when-downgrade"
+        -Server
     }
+
+    # Enable compression
+    encode gzip
 }

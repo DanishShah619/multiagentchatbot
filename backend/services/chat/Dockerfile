@@ -1,19 +1,11 @@
-FROM node
+FROM node:20-alpine
 
 WORKDIR /app
 
+COPY package.json package-lock.json* ./
+RUN npm install --production --frozen-lockfile
 
-COPY package*.json ./
-RUN npm install
+COPY . .
 
-COPY ./services/chat/package*.json ./services/chat/
-RUN cd services/chat && npm install
-
-COPY services/chat ./services/chat
-COPY shared ./shared
-
-WORKDIR /app/services/chat
-
-EXPOSE 8002
-
-CMD [ "npm","start" ]
+EXPOSE 5002
+CMD ["node", "index.js"]

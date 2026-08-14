@@ -1,0 +1,174 @@
+# docker-compose.yml — CortexAI Production Stack
+# Run with: docker compose up -d --build
+#
+# All databases (MongoDB, Qdrant) are MANAGED/CLOUD — not run locally here.
+# Redis is the only container DB used internally.
+
+services:
+
+  # ─────────────────────────────────────────
+  # Caddy — Automatic HTTPS reverse proxy
+  # ─────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: cortex-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 QUIC support
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - cortex-network
+    depends_on:
+      - gateway
+
+  # ─────────────────────────────────────────
+  # Redis — Session Store & Memory Cache
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cortex-redis
+    restart: unless-stopped
+    command: redis-server --requirepass "${REDIS_PASSWORD:-cortexai_secure_redis_pass_2026}" --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cortex-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-cortexai_secure_redis_pass_2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Express API Gateway
+  # ─────────────────────────────────────────
+  gateway:
+    build:
+      context: ./backend/gateway
+      dockerfile: Dockerfile
+    container_name: cortex-gateway
+    restart: unless-stopped
+    env_file:
+      - ./backend/gateway/.env
+    environment:
+      - NODE_ENV=production
+      - AUTH_SERVICE=http://auth:5001
+      - CHAT_SERVICE=http://chat:5002
+      - AGENT_SERVICE=http://agent:5003
+      - BILLING_SERVICE=http://billing:5004
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-cortexai_secure_redis_pass_2026}@redis:6379
+    expose:
+      - "5000"
+    networks:
+      - cortex-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Auth Microservice
+  # ─────────────────────────────────────────
+  auth:
+    build:
+      context: ./backend/services/auth
+      dockerfile: Dockerfile
+    container_name: cortex-auth
+    restart: unless-stopped
+    env_file:
+      - ./backend/services/auth/.env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-cortexai_secure_redis_pass_2026}@redis:6379
+    expose:
+      - "5001"
+    networks:
+      - cortex-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Chat Microservice
+  # ─────────────────────────────────────────
+  chat:
+    build:
+      context: ./backend/services/chat
+      dockerfile: Dockerfile
+    container_name: cortex-chat
+    restart: unless-stopped
+    env_file:
+      - ./backend/services/chat/.env
+    environment:
+      - NODE_ENV=production
+    expose:
+      - "5002"
+    networks:
+      - cortex-network
+
+  # ─────────────────────────────────────────
+  # Agent Microservice (LLM + File Processing)
+  # ─────────────────────────────────────────
+  agent:
+    build:
+      context: ./backend/services/agent
+      dockerfile: Dockerfile
+    container_name: cortex-agent
+    restart: unless-stopped
+    env_file:
+      - ./backend/services/agent/.env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-cortexai_secure_redis_pass_2026}@redis:6379
+      - CHAT_SERVICE=http://chat:5002
+      - AUTH_SERVICE=http://auth:5001
+    expose:
+      - "5003"
+    volumes:
+      - agent_temp:/app/temp
+    networks:
+      - cortex-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Billing Microservice
+  # ─────────────────────────────────────────
+  billing:
+    build:
+      context: ./backend/services/billing
+      dockerfile: Dockerfile
+    container_name: cortex-billing
+    restart: unless-stopped
+    env_file:
+      - ./backend/services/billing/.env
+    environment:
+      - NODE_ENV=production
+      - AUTH_SERVICE=http://auth:5001
+    expose:
+      - "5004"
+    networks:
+      - cortex-network
+
+# ─────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────
+volumes:
+  redis_data:
+  agent_temp:
+  caddy_data:
+  caddy_config:
+
+# ─────────────────────────────────────────
+# Internal Docker Network
+# ─────────────────────────────────────────
+networks:
+  cortex-network:
+    driver: bridge

@@ -1,24 +1,14 @@
-FROM node
+FROM node:20-alpine
 
+# Create app directory
 WORKDIR /app
 
+# Copy package files and install production dependencies
+COPY package.json package-lock.json* ./
+RUN npm install --production --frozen-lockfile
 
-COPY package*.json ./
-RUN npm install
+# Copy application source
+COPY . .
 
-COPY ./gateway/package*.json ./gateway/
-RUN cd gateway && npm install
-
-COPY gateway ./gateway
-COPY shared ./shared
-
-WORKDIR /app/gateway
-
-EXPOSE 8000
-
-CMD [ "npm","start" ]
-
-
-
-
-
+EXPOSE 5000
+CMD ["node", "index.js"]

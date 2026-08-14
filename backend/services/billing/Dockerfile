@@ -1,19 +1,11 @@
-FROM node
+FROM node:20-alpine
 
 WORKDIR /app
 
+COPY package.json package-lock.json* ./
+RUN npm install --production --frozen-lockfile
 
-COPY package*.json ./
-RUN npm install
+COPY . .
 
-COPY ./services/billing/package*.json ./services/billing/
-RUN cd services/billing && npm install
-
-COPY services/billing ./services/billing
-COPY shared ./shared
-
-WORKDIR /app/services/billing
-
-EXPOSE 8004
-
-CMD [ "npm","start" ]
+EXPOSE 5004
+CMD ["node", "index.js"]
