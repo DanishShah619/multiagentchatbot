@@ -10,7 +10,10 @@ import { createConversation } from '../features/createConversation'
 import logOut from '../features/logOut'
 import { setUserdata } from '../redux/userSlice'
 import BillingDrawer from './BillingDrawer'
+import { useNavigate } from 'react-router-dom'
+
 function SideBar() {
+    const navigate = useNavigate()
     const [collapsed, setCollapsed] = useState(false)
     const dispatch = useDispatch()
     const [imageError, setImageError] = useState(false)
@@ -215,9 +218,10 @@ function SideBar() {
                                     <Coins size={16} />
                                 </button>
                                 <button className='flex items-center justify-center w-7 h-7 rounded-[7px] border-none bg-transparent text-slate-600 cursor-pointer hover:bg-white/[0.08] hover:text-slate-400 transition-all duration-150'
-                                    onClick={() => {
-                                        logOut();
-                                        dispatch(setUserdata(null))
+                                    onClick={async () => {
+                                        await logOut();
+                                        dispatch(setUserdata(null));
+                                        navigate('/');
                                     }}
                                 >
                                     <LogOut size={16} />
@@ -225,7 +229,10 @@ function SideBar() {
                             </div>
                         </div>)
                         :
-                        <button className='w-full flex items-center justify-center gap-2 text-sm font-medium text-slate-200 bg-white/[0.05] border border-white/[0.08] rounded-xl py-[11px] cursor-pointer hover:bg-white/[0.08] transition-colors duration-150'>
+                        <button 
+                            onClick={() => navigate('/')} 
+                            className='w-full flex items-center justify-center gap-2 text-sm font-medium text-slate-200 bg-white/[0.05] border border-white/[0.08] rounded-xl py-[11px] cursor-pointer hover:bg-white/[0.08] transition-colors duration-150'
+                        >
                             Login
                         </button>}
                 </div>
