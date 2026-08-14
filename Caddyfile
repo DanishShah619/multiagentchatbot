@@ -2,7 +2,7 @@
 # Caddy automatically provisions and renews HTTPS SSL certificates via Let's Encrypt / ZeroSSL
 # Replace yourdomain.com with your actual domain name pointed to this EC2's Elastic IP.
 
-yourdomain.com {
+13.62.187.160.sslip.io {
     # Reverse proxy to Express Gateway via Docker internal network
     reverse_proxy gateway:5000 {
         header_up Host {host}
