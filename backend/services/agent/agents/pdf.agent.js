@@ -3,6 +3,8 @@ import { generatePdf } from "../utils/generatePdf.js"
 import { uploadBufferToCloudinary } from "../utils/cloudinary.js"
 import { deductCredits } from "../utils/deductCredits.js"
 import { checkAgentLimit } from "../config/agentLimit.js"
+import { cleanAndParseJson } from "../utils/parseJson.js"
+
 export const pdfAgent=async (state) => {
     try {
         const rate=await checkAgentLimit(state.userId,"pdf")
@@ -41,7 +43,7 @@ ${state.prompt}
         `
 
         const res=await llm.invoke(prompt)
-        const data=JSON.parse(res.content)
+        const data=cleanAndParseJson(res.content)
         await deductCredits(state.userId,"pdf")
         
         const pdfBuffer=await generatePdf(data)
