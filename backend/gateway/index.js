@@ -83,6 +83,14 @@ app.options(/.*/, cors({
     optionsSuccessStatus: 204
 }))
 
+// Stripe Webhook: Direct raw byte proxy mounted BEFORE express.json()
+// CRITICAL: parseReqBody: false preserves exact raw bytes needed for HMAC-SHA256 signature verification
+app.use("/api/billing/webhook", proxy(process.env.BILLING_SERVICE, {
+    parseReqBody: false,
+    limit: "50mb",
+    proxyReqPathResolver: () => "/webhook"
+}))
+
 app.use(express.json({ limit: "50mb" }))
 app.use(express.urlencoded({ extended: true, limit: "50mb" }))
 app.use(morgan("dev"))
@@ -95,11 +103,6 @@ app.use(["/api/auth/update-plan", "/api/auth/deduct-credits", "/api/auth/refund-
 app.use("/api/auth", authLimiter, proxy(process.env.AUTH_SERVICE, { limit: "50mb" }))
 app.use("/api/chat", protect, proxyWithHeader(process.env.CHAT_SERVICE))
 app.use("/api/agent", protect, agentLimiter, proxyWithHeader(process.env.AGENT_SERVICE))
-// Stripe Webhook: Direct proxy without user session cookie check (authenticated via Stripe signature)
-app.use("/api/billing/webhook", proxy(process.env.BILLING_SERVICE, {
-    limit: "50mb",
-    proxyReqPathResolver: () => "/webhook"
-}))
 app.use("/api/billing", protect, billingLimiter, proxyWithHeader(process.env.BILLING_SERVICE))
 app.get("/api/me", protect, getCurrentUser)
 app.get("/",(req,res)=>{
