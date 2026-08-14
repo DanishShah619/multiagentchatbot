@@ -66,8 +66,12 @@ app.use(["/api/auth/update-plan", "/api/auth/deduct-credits", "/api/auth/refund-
 app.use("/api/auth",authLimiter,proxy(process.env.AUTH_SERVICE))
 app.use("/api/chat",protect,proxyWithHeader(process.env.CHAT_SERVICE))
 app.use("/api/agent",protect,agentLimiter,proxyWithHeader(process.env.AGENT_SERVICE))
-app.use("/api/billing",protect,billingLimiter,proxyWithHeader(process.env.BILLING_SERVICE))
-app.get("/api/me",protect,getCurrentUser)
+// Stripe Webhook: Direct proxy without user session cookie check (authenticated via Stripe signature)
+app.use("/api/billing/webhook", proxy(process.env.BILLING_SERVICE, {
+    proxyReqPathResolver: () => "/webhook"
+}))
+app.use("/api/billing", protect, billingLimiter, proxyWithHeader(process.env.BILLING_SERVICE))
+app.get("/api/me", protect, getCurrentUser)
 app.get("/",(req,res)=>{
     res.json({message:"hello from gateway v5"})
 })

@@ -1,7 +1,6 @@
 import { getModel } from "../config/llmModels.js"
 import { generatePpt } from "../utils/generatePpt.js"
-import { getFromS3 } from "../utils/getFromS3.js"
-import { uploadToS3 } from "../utils/uploadToS3.js"
+import { uploadBufferToCloudinary } from "../utils/cloudinary.js"
 import { deductCredits } from "../utils/deductCredits.js"
 import { checkAgentLimit } from "../config/agentLimit.js"
 export const pptAgent=async (state) => {
@@ -52,19 +51,17 @@ const buffer=await ppt.write({
 })
 
 const filename=`ppt-${Date.now()}.pptx`
-
-await uploadToS3(filename,buffer,"application/vnd.openxmlformats-officedocument.presentationml.presentation")
-const downloadUrl=await getFromS3(filename,24*60*60)
+const uploadResult = await uploadBufferToCloudinary(buffer, filename, "cortexai_ppts")
+const downloadUrl = uploadResult?.url || "#"
 
 return {
     ...state,
+    artifacts: [downloadUrl],
     aiResponse:`# ✅ Presentation Generated
 
 **${data.title}**
 
-📥 [Download PPT](${downloadUrl})
-
-_Link expires in 10 minutes._`
+📥 [Download PPT](${downloadUrl})`
 }
 
     } catch (error) {
@@ -73,8 +70,5 @@ _Link expires in 10 minutes._`
             ...state,
             aiResponse:error?.data?.message || "failed to generate ppt"
         }
-       
-
-       
     }
 }

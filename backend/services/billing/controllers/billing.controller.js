@@ -29,8 +29,8 @@ export const createCheckoutSession = async (req, res) => {
             ],
             mode: "payment",
             // Stripe redirects user here after payment
-            success_url: `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL}/payment/cancelled`,
+            success_url: `${process.env.FRONTEND_URL}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/?payment=cancelled`,
             // Attach userId so webhook can identify the user
             metadata: {
                 userId,

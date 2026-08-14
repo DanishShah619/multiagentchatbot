@@ -1,40 +1,28 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { AnimatePresence, motion } from "motion/react"
-import { Crown, X } from 'lucide-react'
+import { Crown, X, Loader2 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { createOrder } from '../features/createOrder'
-import { verifyPayment } from '../features/verifyPayment'
+
 function BillingDrawer({ open, onClose }) {
 
     const { userData } = useSelector(state => state.user)
+    const [loadingPlan, setLoadingPlan] = useState(null)
 
     const handleUpgrade = async (plan) => {
         try {
-            const data = await createOrder(plan)
-            const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-                amount: data?.order?.amount,
-                currency: data?.order?.currency,
-                name: "CortexAI",
-                description: `${data?.plan?.name} Plan`,
-                order_id: data?.order?.id,
-                handler: async (response) => {
-                    try {
-                        const data = await verifyPayment(response)
-                        console.log(data)
-                    } catch (error) {
-                        console.log(error)
-                    }
-                },
-                theme: {
-                    color: "#4F46E5"
-                }
+            setLoadingPlan(plan)
+            const res = await createOrder(plan)
+            if (res?.success && res?.url) {
+                window.location.href = res.url
+            } else {
+                alert(res?.error || "Failed to start payment checkout.")
             }
-
-            const razorpay = new window.Razorpay(options)
-            razorpay.open()
         } catch (error) {
-            console.log(error)
+            console.error("[handleUpgrade]", error)
+            alert("Payment initiation failed.")
+        } finally {
+            setLoadingPlan(null)
         }
     }
     return (
@@ -115,15 +103,27 @@ function BillingDrawer({ open, onClose }) {
 
                         <div className='rounded-xl border border-white/10 p-4'>
                             <h3 className='text-white font-semibold'>Starter Plan</h3>
-                            <p className='text-indigo-400 text-2xl font-bold mt-2'>₹199</p>
+                            <p className='text-indigo-400 text-2xl font-bold mt-2'>$2.99</p>
                             <p className='text-slate-400 text-sm mt-1'>500 Credits</p>
-                            <button className='mt-4 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 py-2 text-white' onClick={() => handleUpgrade("starter")}>Upgrade</button>
+                            <button 
+                                disabled={loadingPlan !== null}
+                                className='mt-4 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 py-2 text-white flex items-center justify-center gap-2 disabled:opacity-50' 
+                                onClick={() => handleUpgrade("starter")}
+                            >
+                                {loadingPlan === "starter" ? <Loader2 size={16} className='animate-spin' /> : "Upgrade"}
+                            </button>
                         </div>
                         <div className='rounded-xl border border-white/10 p-4'>
                             <h3 className='text-white font-semibold'>Pro Plan</h3>
-                            <p className='text-indigo-400 text-2xl font-bold mt-2'>₹499</p>
+                            <p className='text-indigo-400 text-2xl font-bold mt-2'>$7.99</p>
                             <p className='text-slate-400 text-sm mt-1'>1000 Credits</p>
-                            <button className='mt-4 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 py-2 text-white' onClick={() => handleUpgrade("pro")}>Upgrade</button>
+                            <button 
+                                disabled={loadingPlan !== null}
+                                className='mt-4 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 py-2 text-white flex items-center justify-center gap-2 disabled:opacity-50' 
+                                onClick={() => handleUpgrade("pro")}
+                            >
+                                {loadingPlan === "pro" ? <Loader2 size={16} className='animate-spin' /> : "Upgrade"}
+                            </button>
                         </div>
                     </div>
 
