@@ -47,9 +47,12 @@ export const agent = async (req, res, next) => {
             }
         }
 
+        const internalSecret = process.env.INTERNAL_SECRET || "cortexai-internal-secret-key-2026"
+        const chatHeaders = { "x-user-id": userId, "x-internal-secret": internalSecret }
+
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`, {
             conversationId, role: "user", content: prompt
-        })
+        }, { headers: chatHeaders })
 
         const result = await graph.invoke({
             prompt, conversationId, agent: targetAgent, userId, file, fileUrl
@@ -59,7 +62,7 @@ export const agent = async (req, res, next) => {
         await addMessage(conversationId, "assistant", result.aiResponse)
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`, {
             conversationId, role: "assistant", content: result?.aiResponse, images: result?.images, artifacts: result?.artifacts
-        })
+        }, { headers: chatHeaders })
 
         return res.status(200).json({
             answer: result?.aiResponse,
