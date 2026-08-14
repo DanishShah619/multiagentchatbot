@@ -75,7 +75,7 @@ app.use(cors({
 // express-http-proxy intercepts requests before CORS headers are sent on proxied routes.
 // This catches all OPTIONS preflight requests and responds immediately with CORS headers
 // before they can be forwarded to the downstream microservices.
-app.options("*", cors({
+app.options(/.*/, cors({
     origin: (origin, callback) => callback(null, true),
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
