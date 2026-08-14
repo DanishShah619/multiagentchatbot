@@ -1,27 +1,36 @@
-import { signInWithPopup } from 'firebase/auth'
 import React, { useEffect } from 'react'
-import { auth, googleProvider } from '../utils/firebase'
-import api from '../utils/axios'
-import Home from './pages/Home'
-import getCurrentUser from './features/getCurrentUser'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
+import Home from './pages/Home'
+import LandingPage from './pages/LandingPage'
+import getCurrentUser from './features/getCurrentUser'
 import { setUserdata } from './redux/userSlice'
 
 function App() {
+  const dispatch = useDispatch()
 
-const dispatch=useDispatch()
-useEffect(()=>{
-  const getUser=async ()=>{
-    const data=await getCurrentUser()
-    dispatch(setUserdata(data))
-  }
-  getUser()
-},[])
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const data = await getCurrentUser()
+        if (data) {
+          dispatch(setUserdata(data))
+        }
+      } catch (err) {
+        console.error('[App/getUser]', err)
+      }
+    }
+    getUser()
+  }, [dispatch])
 
   return (
-   <>
-   <Home/>
-   </>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<Home />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
