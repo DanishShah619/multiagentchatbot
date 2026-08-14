@@ -71,15 +71,28 @@ app.use(cors({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user-email", "stripe-signature"]
 }))
+// CRITICAL: Explicit OPTIONS preflight handler.
+// express-http-proxy intercepts requests before CORS headers are sent on proxied routes.
+// This catches all OPTIONS preflight requests and responds immediately with CORS headers
+// before they can be forwarded to the downstream microservices.
+app.options("*", cors({
+    origin: (origin, callback) => callback(null, true),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user-email", "stripe-signature"],
+    optionsSuccessStatus: 204
+}))
+
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 app.use(morgan("dev"))
 app.use(cookieParser())
+
 // SEC-03: Block public access to all internal-only auth endpoints
 app.use(["/api/auth/update-plan", "/api/auth/deduct-credits", "/api/auth/refund-credits"], (req, res) => {
     return res.status(403).json({ message: "Forbidden: Internal route" })
 })
-app.use("/api/auth",authLimiter,proxy(process.env.AUTH_SERVICE))
+app.use("/api/auth", authLimiter, proxy(process.env.AUTH_SERVICE))
 app.use("/api/chat",protect,proxyWithHeader(process.env.CHAT_SERVICE))
 app.use("/api/agent",protect,agentLimiter,proxyWithHeader(process.env.AGENT_SERVICE))
 // Stripe Webhook: Direct proxy without user session cookie check (authenticated via Stripe signature)
