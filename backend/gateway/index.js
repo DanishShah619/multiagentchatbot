@@ -83,8 +83,8 @@ app.options(/.*/, cors({
     optionsSuccessStatus: 204
 }))
 
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ extended: true, limit: "10mb" }))
+app.use(express.json({ limit: "50mb" }))
+app.use(express.urlencoded({ extended: true, limit: "50mb" }))
 app.use(morgan("dev"))
 app.use(cookieParser())
 
@@ -92,11 +92,12 @@ app.use(cookieParser())
 app.use(["/api/auth/update-plan", "/api/auth/deduct-credits", "/api/auth/refund-credits"], (req, res) => {
     return res.status(403).json({ message: "Forbidden: Internal route" })
 })
-app.use("/api/auth", authLimiter, proxy(process.env.AUTH_SERVICE))
-app.use("/api/chat",protect,proxyWithHeader(process.env.CHAT_SERVICE))
-app.use("/api/agent",protect,agentLimiter,proxyWithHeader(process.env.AGENT_SERVICE))
+app.use("/api/auth", authLimiter, proxy(process.env.AUTH_SERVICE, { limit: "50mb" }))
+app.use("/api/chat", protect, proxyWithHeader(process.env.CHAT_SERVICE))
+app.use("/api/agent", protect, agentLimiter, proxyWithHeader(process.env.AGENT_SERVICE))
 // Stripe Webhook: Direct proxy without user session cookie check (authenticated via Stripe signature)
 app.use("/api/billing/webhook", proxy(process.env.BILLING_SERVICE, {
+    limit: "50mb",
     proxyReqPathResolver: () => "/webhook"
 }))
 app.use("/api/billing", protect, billingLimiter, proxyWithHeader(process.env.BILLING_SERVICE))

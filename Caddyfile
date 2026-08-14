@@ -3,6 +3,10 @@
 # Replace yourdomain.com with your actual domain name pointed to this EC2's Elastic IP.
 
 13.62.187.160.sslip.io {
+    request_body {
+        max_size 50MB
+    }
+
     # Reverse proxy to Express Gateway via Docker internal network
     reverse_proxy gateway:5000 {
         header_up Host {host}

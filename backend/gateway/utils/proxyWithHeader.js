@@ -2,6 +2,7 @@ import proxy from "express-http-proxy"
 
 export const proxyWithHeader = (serviceUrl) => {
     return proxy(serviceUrl, {
+        limit: "50mb",
         proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
             // OPT-06: Sanitize client headers to prevent header spoofing
             delete proxyReqOpts.headers["x-user-id"]
