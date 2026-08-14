@@ -51,9 +51,25 @@ app.use((req, res, next) => {
     next()
 })
 
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    "https://multiagentchatbot.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000"
+].filter(Boolean).map(url => url.replace(/\/$/, ""))
+
 app.use(cors({
-    origin:process.env.FRONTEND_URL,
-    credentials:true
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+        const cleanOrigin = origin.replace(/\/$/, "")
+        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith(".vercel.app")) {
+            return callback(null, true)
+        }
+        return callback(null, true)
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user-email", "stripe-signature"]
 }))
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
