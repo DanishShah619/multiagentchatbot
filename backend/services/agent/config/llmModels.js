@@ -33,17 +33,21 @@ const openrouter = new ChatOpenRouter({
 export const getModel = async (agent) => {
     switch (agent) {
         case "chat":
-            return process.env.HUGGINGFACEHUB_API_TOKEN ? huggingface : groq;
+            return process.env.GROQ_API_KEY ? groq : (process.env.GEMINI_API_KEY ? gemini : huggingface);
         case "search":
             return groq;
         case "coding":
-            return openrouter;
+            return process.env.OPENROUTER_API_KEY ? openrouter : groq;
         case "imageAnalyzer":
             return gemini;
+        case "pdf-rag":
+            return process.env.GROQ_API_KEY ? groq : gemini;
+        case "intent":
+            return process.env.GROQ_API_KEY ? groq : gemini;
         case "huggingface":
             return huggingface;
         default:
-            return process.env.HUGGINGFACEHUB_API_TOKEN ? huggingface : groq;
+            return process.env.GROQ_API_KEY ? groq : gemini;
     }
 }
 
